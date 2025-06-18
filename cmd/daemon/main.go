@@ -267,8 +267,21 @@ func (d *Daemon) handleToggle(request map[string]interface{}, encoder *json.Enco
 		return
 	}
 
+	// Unregister old hotkey if it was enabled
+	if macro.Enabled && macro.Hotkey != "" {
+		d.keylogger.UnregisterHotkey(macro.Hotkey)
+	}
+	
 	macro.Enabled = !macro.Enabled
 	d.macros[macroID] = macro
+
+	// Register new hotkey if now enabled
+	if macro.Enabled && macro.Hotkey != "" {
+		macroIDCopy := macroID // Capture for closure
+		d.keylogger.RegisterHotkey(macro.Hotkey, func() {
+			d.playbackMacro(macroIDCopy)
+		})
+	}
 
 	// Save to storage
 	d.saveMacros()
@@ -285,6 +298,13 @@ func (d *Daemon) handleDelete(request map[string]interface{}, encoder *json.Enco
 
 	d.mu.Lock()
 	defer d.mu.Unlock()
+
+	// Unregister hotkey if macro had one
+	if macro, exists := d.macros[macroID]; exists {
+		if macro.Enabled && macro.Hotkey != "" {
+			d.keylogger.UnregisterHotkey(macro.Hotkey)
+		}
+	}
 
 	delete(d.macros, macroID)
 
@@ -432,19 +452,30 @@ func (d *Daemon) handleUpdate(request map[string]interface{}, encoder *json.Enco
 	defer d.mu.Unlock()
 	
 	// Check if macro exists
-	if _, exists := d.macros[macro.ID]; !exists {
+	oldMacro, exists := d.macros[macro.ID]
+	if !exists {
 		encoder.Encode(map[string]string{"error": "macro not found"})
 		return
+	}
+	
+	// Unregister old hotkey if it was enabled
+	if oldMacro.Enabled && oldMacro.Hotkey != "" {
+		d.keylogger.UnregisterHotkey(oldMacro.Hotkey)
 	}
 	
 	// Update the macro
 	d.macros[macro.ID] = macro
 	
+	// Register new hotkey if enabled
+	if macro.Enabled && macro.Hotkey != "" {
+		macroIDCopy := macro.ID // Capture for closure
+		d.keylogger.RegisterHotkey(macro.Hotkey, func() {
+			d.playbackMacro(macroIDCopy)
+		})
+	}
+	
 	// Save to storage
 	d.saveMacros()
-	
-	// Re-register hotkey if changed
-	// TODO: Implement hotkey update logic
 	
 	encoder.Encode(map[string]bool{"success": true})
 }

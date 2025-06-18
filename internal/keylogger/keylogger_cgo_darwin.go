@@ -219,6 +219,7 @@ import "C"
 import (
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -241,6 +242,7 @@ type Keylogger struct {
 	recordingChan chan models.KeyAction
 	stopChan      chan bool
 	runLoop       bool
+	monitoring    bool  // True when monitoring for hotkeys
 	mu            sync.Mutex
 }
 
@@ -366,7 +368,7 @@ func goKeyCallback(keyCode C.int, flags C.int, eventType C.int) {
 	kl := globalKeylogger
 	globalMutex.Unlock()
 
-	if kl == nil || !kl.recording {
+	if kl == nil {
 		return
 	}
 
@@ -380,11 +382,6 @@ func goKeyCallback(keyCode C.int, flags C.int, eventType C.int) {
 	if keyStr == "unknown" {
 		return
 	}
-
-	// Calculate delay
-	currentTime := time.Now()
-	delay := currentTime.Sub(kl.lastKeyTime)
-	kl.lastKeyTime = currentTime
 
 	// Extract modifiers from flags
 	modifiers := []string{}
@@ -401,17 +398,61 @@ func goKeyCallback(keyCode C.int, flags C.int, eventType C.int) {
 		modifiers = append(modifiers, "cmd")
 	}
 
-	keyAction := models.KeyAction{
-		Key:       keyStr,
-		Delay:     delay,
-		Modifiers: modifiers,
+	// Check for hotkey matches when monitoring
+	if kl.monitoring && !kl.recording {
+		hotkeyStr := buildHotkeyString(keyStr, modifiers)
+		kl.mu.Lock()
+		if callback, exists := kl.hotkeys[hotkeyStr]; exists {
+			kl.mu.Unlock()
+			// Execute callback in a goroutine to avoid blocking
+			go callback()
+			return
+		}
+		kl.mu.Unlock()
 	}
 
-	select {
-	case kl.recordingChan <- keyAction:
-	default:
-		// Channel full, skip
+	// Handle recording
+	if kl.recording {
+		// Calculate delay
+		currentTime := time.Now()
+		delay := currentTime.Sub(kl.lastKeyTime)
+		kl.lastKeyTime = currentTime
+
+		keyAction := models.KeyAction{
+			Key:       keyStr,
+			Delay:     delay,
+			Modifiers: modifiers,
+		}
+
+		select {
+		case kl.recordingChan <- keyAction:
+		default:
+			// Channel full, skip
+		}
 	}
+}
+
+// buildHotkeyString creates a normalized hotkey string from key and modifiers
+func buildHotkeyString(key string, modifiers []string) string {
+	// Sort modifiers for consistent ordering
+	sortedMods := make([]string, len(modifiers))
+	copy(sortedMods, modifiers)
+	
+	// Custom sort order: ctrl, alt, shift, cmd
+	modOrder := map[string]int{"ctrl": 0, "alt": 1, "shift": 2, "cmd": 3}
+	for i := 0; i < len(sortedMods)-1; i++ {
+		for j := i + 1; j < len(sortedMods); j++ {
+			if modOrder[sortedMods[i]] > modOrder[sortedMods[j]] {
+				sortedMods[i], sortedMods[j] = sortedMods[j], sortedMods[i]
+			}
+		}
+	}
+	
+	// Build the hotkey string
+	if len(sortedMods) > 0 {
+		return strings.Join(sortedMods, "+") + "+" + key
+	}
+	return key
 }
 
 // Keep the existing AddRecordedKey for manual recording via TUI
@@ -488,10 +529,80 @@ func (k *Keylogger) PlaybackMacro(macro models.Macro) error {
 }
 
 func (k *Keylogger) RegisterHotkey(hotkey string, callback func()) error {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	
 	k.hotkeys[hotkey] = callback
 	log.Printf("Registered hotkey: %s", hotkey)
-	// TODO: Implement actual hotkey registration
+	
+	// Start monitoring if not already started
+	if !k.monitoring && len(k.hotkeys) > 0 {
+		go k.StartHotkeyMonitoring()
+	}
+	
 	return nil
+}
+
+func (k *Keylogger) UnregisterHotkey(hotkey string) {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	
+	delete(k.hotkeys, hotkey)
+	log.Printf("Unregistered hotkey: %s", hotkey)
+	
+	// Stop monitoring if no hotkeys left
+	if k.monitoring && len(k.hotkeys) == 0 {
+		k.StopHotkeyMonitoring()
+	}
+}
+
+func (k *Keylogger) StartHotkeyMonitoring() error {
+	k.mu.Lock()
+	if k.monitoring {
+		k.mu.Unlock()
+		return fmt.Errorf("already monitoring")
+	}
+	k.monitoring = true
+	k.mu.Unlock()
+	
+	// Check permissions
+	if C.hasAccessibilityPermissions() == 0 {
+		k.monitoring = false
+		return fmt.Errorf("accessibility permissions not granted")
+	}
+	
+	// Start the event tap
+	result := C.startKeyCapture()
+	if result != 0 {
+		k.monitoring = false
+		if result == -1 {
+			return fmt.Errorf("accessibility permissions required")
+		}
+		return fmt.Errorf("failed to start key capture")
+	}
+	
+	// Start the run loop
+	go k.runEventLoop()
+	
+	log.Println("Started hotkey monitoring")
+	return nil
+}
+
+func (k *Keylogger) StopHotkeyMonitoring() {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	
+	if !k.monitoring {
+		return
+	}
+	
+	k.monitoring = false
+	k.runLoop = false
+	
+	// Stop the event tap
+	C.stopKeyCapture()
+	
+	log.Println("Stopped hotkey monitoring")
 }
 
 // getKeyCode converts a key string to keybd_event keycode
