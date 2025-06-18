@@ -662,13 +662,15 @@ func (k *Keylogger) RegisterHotkey(hotkey string, callback func()) error {
 
 func (k *Keylogger) UnregisterHotkey(hotkey string) {
 	k.mu.Lock()
-	defer k.mu.Unlock()
-	
 	delete(k.hotkeys, hotkey)
 	log.Printf("Unregistered hotkey: %s", hotkey)
 	
-	// Stop monitoring if no hotkeys left
-	if k.monitoring && len(k.hotkeys) == 0 {
+	// Check if we should stop monitoring
+	shouldStop := k.monitoring && len(k.hotkeys) == 0
+	k.mu.Unlock()
+	
+	// Stop monitoring if no hotkeys left (without holding the lock)
+	if shouldStop {
 		k.StopHotkeyMonitoring()
 	}
 }
