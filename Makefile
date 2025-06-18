@@ -3,7 +3,7 @@
 build: build-daemon build-tui
 
 build-daemon:
-	go build -o bin/macrod-daemon cmd/daemon/main.go
+	CGO_ENABLED=1 go build -o bin/macrod-daemon cmd/daemon/main.go
 
 build-tui:
 	go build -o bin/macrod-tui cmd/tui/main.go

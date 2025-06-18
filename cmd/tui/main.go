@@ -514,17 +514,7 @@ func (m model) updateRecording(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					// Convert KeyActions to display strings
 					m.recordedKeys = []string{}
 					for _, action := range keys {
-						keyStr := action.Key
-						if len(action.Modifiers) > 0 {
-							for _, mod := range action.Modifiers {
-								if mod == "shift" && len(keyStr) == 1 {
-									// Don't add (shift) suffix for single letters
-									keyStr = keyStr + " (shift)"
-									break
-								}
-							}
-						}
-						m.recordedKeys = append(m.recordedKeys, keyStr)
+						m.recordedKeys = append(m.recordedKeys, action.Key)
 					}
 				}
 			}
@@ -729,7 +719,7 @@ func (m model) viewEditMacro() string {
 		keyStr := ""
 		for i, k := range m.recordedKeys {
 			if i > 0 {
-				keyStr += " → "
+				keyStr += " · "
 			}
 			keyStr += formatKeyDisplay(k)
 		}
@@ -823,7 +813,7 @@ func (m model) viewRecording() string {
 		keyStr := ""
 		for i, k := range m.recordedKeys {
 			if i > 0 {
-				keyStr += " → "
+				keyStr += " · "
 			}
 			keyStr += formatKeyDisplay(k)
 		}

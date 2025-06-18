@@ -445,19 +445,11 @@ func (d *Daemon) handlePlay(request map[string]interface{}, encoder *json.Encode
 }
 
 func (d *Daemon) handleGetRecordingStatus(encoder *json.Encoder) {
-	if !d.recording {
-		encoder.Encode(map[string]interface{}{
-			"recording": false,
-			"keys":      []models.KeyAction{},
-		})
-		return
-	}
-	
 	// Get current recorded keys from keylogger (without stopping)
 	keys := d.keylogger.GetCurrentRecordedKeys()
 	
 	encoder.Encode(map[string]interface{}{
-		"recording": true,
+		"recording": d.recording,
 		"keys":      keys,
 	})
 }

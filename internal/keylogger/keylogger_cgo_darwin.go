@@ -439,8 +439,10 @@ func (k *Keylogger) PauseRecording() {
 		return
 	}
 	
+	// Mark recording as paused
+	k.recording = false
+	
 	// Don't stop the event tap if we're monitoring for hotkeys
-	// Just mark recording as paused
 	if !k.monitoring {
 		k.runLoop = false
 		C.stopKeyCapture()
@@ -453,14 +455,16 @@ func (k *Keylogger) StopRecording() []models.KeyAction {
 	k.mu.Lock()
 	defer k.mu.Unlock()
 
-	if !k.recording {
+	// Even if recording is paused, we still want to return the captured keys
+	wasRecording := k.recording || len(k.currentKeys) > 0
+	if !wasRecording {
 		return nil
 	}
 	
 	k.recording = false
 	
 	// Only stop the event tap if we're not monitoring for hotkeys
-	if !k.monitoring {
+	if !k.monitoring && k.runLoop {
 		k.runLoop = false
 		C.stopKeyCapture()
 	}
@@ -489,10 +493,6 @@ func (k *Keylogger) StopRecording() []models.KeyAction {
 func (k *Keylogger) GetCurrentRecordedKeys() []models.KeyAction {
 	k.mu.Lock()
 	defer k.mu.Unlock()
-	
-	if !k.recording {
-		return []models.KeyAction{}
-	}
 	
 	// Return a copy of current keys (excluding the last one if it's escape)
 	keys := make([]models.KeyAction, 0, len(k.currentKeys))
