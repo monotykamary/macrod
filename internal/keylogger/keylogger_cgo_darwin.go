@@ -418,6 +418,21 @@ func (k *Keylogger) StartRecording(onKeyPress func(key models.KeyAction)) error 
 	return nil
 }
 
+func (k *Keylogger) PauseRecording() {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	
+	if !k.recording {
+		return
+	}
+	
+	// Just stop capturing but keep the recording state and keys
+	k.runLoop = false
+	C.stopKeyCapture()
+	
+	log.Println("Paused key recording")
+}
+
 func (k *Keylogger) StopRecording() []models.KeyAction {
 	k.mu.Lock()
 	defer k.mu.Unlock()
@@ -429,7 +444,7 @@ func (k *Keylogger) StopRecording() []models.KeyAction {
 	k.recording = false
 	k.runLoop = false
 	
-	// Stop the event tap
+	// Stop the event tap if it's still running
 	C.stopKeyCapture()
 	
 	// Signal stop

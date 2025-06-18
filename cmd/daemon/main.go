@@ -212,6 +212,8 @@ func (d *Daemon) handleConnection(conn net.Conn) {
 		d.handleDelete(request, encoder)
 	case "startRecording":
 		d.handleStartRecording(encoder)
+	case "pauseRecording":
+		d.handlePauseRecording(encoder)
 	case "stopRecording":
 		d.handleStopRecording(request, encoder)
 	case "addKey":
@@ -342,6 +344,18 @@ func (d *Daemon) handleStartRecording(encoder *json.Encoder) {
 	}
 
 	log.Println("✅ Started global key recording")
+	encoder.Encode(map[string]bool{"success": true})
+}
+
+func (d *Daemon) handlePauseRecording(encoder *json.Encoder) {
+	if !d.recording {
+		encoder.Encode(map[string]string{"error": "not recording"})
+		return
+	}
+	
+	// Pause the keylogger without losing recorded keys
+	d.keylogger.PauseRecording()
+	log.Println("⏸️  Paused key recording")
 	encoder.Encode(map[string]bool{"success": true})
 }
 

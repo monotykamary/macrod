@@ -133,6 +133,13 @@ func (c *Client) StartRecording() error {
 	return err
 }
 
+func (c *Client) PauseRecording() error {
+	_, err := c.sendRequest(map[string]interface{}{
+		"command": "pauseRecording",
+	})
+	return err
+}
+
 func (c *Client) GetRecordingStatus() ([]models.KeyAction, error) {
 	resp, err := c.sendRequest(map[string]interface{}{
 		"command": "getRecordingStatus",

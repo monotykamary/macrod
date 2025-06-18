@@ -503,6 +503,11 @@ func (m model) updateRecording(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.nameInput.Focus()
 			m.activeInput = 0
 			
+			// Pause the daemon recording
+			if m.ipcClient != nil {
+				m.ipcClient.PauseRecording()
+			}
+			
 			// Get the recorded keys from daemon
 			if m.ipcClient != nil {
 				if keys, err := m.ipcClient.GetRecordingStatus(); err == nil {
