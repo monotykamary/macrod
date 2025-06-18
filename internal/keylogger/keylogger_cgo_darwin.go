@@ -162,8 +162,14 @@ static void playKeyEvent(int keyCode, int flags, int isKeyDown) {
         // Set modifier flags
         CGEventSetFlags(event, (CGEventFlags)flags);
         
-        // Post the event
+        // Set a timestamp to ensure proper ordering
+        CGEventSetTimestamp(event, 0); // 0 means "now"
+        
+        // Post the event to the HID event tap
         CGEventPost(kCGHIDEventTap, event);
+        
+        // Also try posting to the session for better compatibility
+        // CGEventPost(kCGSessionEventTap, event);
         
         // Release the event
         CFRelease(event);
@@ -695,22 +701,35 @@ func (k *Keylogger) PlaybackMacro(macro models.Macro) error {
 	
 	log.Printf("Playing back macro: %s (%d actions, speed: %.1fx)", macro.Name, len(macro.Actions), speedMultiplier)
 	
+	prevKey := ""
 	for i, action := range macro.Actions {
 		// Wait for the specified delay (except for the first action)
-		if i > 0 && action.Delay > 0 {
-			// Apply speed multiplier to delay
-			delay := time.Duration(float32(action.Delay) / speedMultiplier)
+		if i > 0 {
+			// Use recorded delay or a default if not specified
+			delay := action.Delay
+			if delay == 0 {
+				// Default delay between keys if none recorded
+				delay = 50 * time.Millisecond
+			}
 			
-			// For navigation keys, ensure minimum responsiveness
-			if isNavigationKey(action.Key) && delay > 20*time.Millisecond {
-				delay = 20 * time.Millisecond
-			} else if delay < 1*time.Millisecond {
-				// Ensure minimum 1ms delay to prevent issues
-				delay = 1 * time.Millisecond
+			// Apply speed multiplier to delay
+			delay = time.Duration(float32(delay) / speedMultiplier)
+			
+			// Ensure minimum delay to prevent overlapping keys (3 frames)
+			minDelay := 51 * time.Millisecond
+			
+			// If switching between arrow keys, add extra buffer
+			if isNavigationKey(prevKey) && isNavigationKey(action.Key) && prevKey != action.Key {
+				minDelay = 68 * time.Millisecond  // 4 frames for direction changes
+			}
+			
+			if delay < minDelay {
+				delay = minDelay
 			}
 			
 			time.Sleep(delay)
 		}
+		prevKey = action.Key
 		
 		// Get the keycode
 		keyCode := C.getKeycodeFromString(C.CString(action.Key))
@@ -737,16 +756,33 @@ func (k *Keylogger) PlaybackMacro(macro models.Macro) error {
 		// Send key down event
 		C.playKeyEvent(keyCode, C.int(flags), 1)
 		
-		// Minimal delay between press and release (1ms)
-		time.Sleep(1 * time.Millisecond)
+		// Key press duration - 51ms ensures three full frames at 60fps
+		// This gives games enough time to register the key press
+		pressDuration := 51 * time.Millisecond
+		
+		// Apply speed multiplier to press duration, but maintain minimum for reliability
+		pressDuration = time.Duration(float32(pressDuration) / speedMultiplier)
+		if pressDuration < 17*time.Millisecond {
+			// Even at high speeds, we need at least one frame for reliable registration
+			pressDuration = 17 * time.Millisecond
+		}
+		
+		time.Sleep(pressDuration)
 		
 		// Send key up event
 		C.playKeyEvent(keyCode, C.int(flags), 0)
 		
-		// Only add post-release delay for non-navigation keys
-		if !isNavigationKey(action.Key) {
-			time.Sleep(2 * time.Millisecond)
+		// Post-release delay - three frames to ensure key up is registered
+		postDelay := 51 * time.Millisecond
+		
+		// Apply speed multiplier to post delay, but maintain minimum
+		postDelay = time.Duration(float32(postDelay) / speedMultiplier)
+		if postDelay < 17*time.Millisecond {
+			// Minimum one frame to ensure key release is registered
+			postDelay = 17 * time.Millisecond
 		}
+		
+		time.Sleep(postDelay)
 	}
 	
 	return nil
@@ -761,6 +797,18 @@ func isNavigationKey(key string) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+// isGameActionKey checks if a key is commonly used for game actions that need solid registration
+func isGameActionKey(key string) bool {
+	switch key {
+	case "a", "b", "x", "y", // Common gamepad-mapped keys
+	     "z", "c", "v",       // Common action keys
+	     "space", "enter":    // Common action keys
+		return true
+	default:
+		return len(key) == 1 // Single letter keys are often action keys
 	}
 }
 

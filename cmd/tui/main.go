@@ -389,13 +389,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				macro := m.macros[m.table.Cursor()]
 				m.editTarget = &macro
 				m.state = stateEditMacro
-				m.activeInput = 0
+				m.activeInput = 2  // Start at hotkey field (0=name, 1=desc, 2=hotkey)
 				
 				// Pre-fill the inputs with current values
 				m.nameInput.SetValue(macro.Name)
 				m.descInput.SetValue(macro.Description)
 				m.hotkeyInput.SetValue(macro.Hotkey)
-				m.nameInput.Focus()
+				
+				// Focus the hotkey input
+				m.nameInput.Blur()
+				m.descInput.Blur()
+				m.hotkeyInput.Focus()
 				
 				// Convert actions back to key strings for display
 				m.recordedKeys = []string{}
