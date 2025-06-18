@@ -10,12 +10,12 @@ A powerful TUI-based macro recording and playback daemon for macOS, designed for
 
 - 🎮 **Game-Ready**: Designed specifically for gameplay automation and combo execution
 - 🎨 **Beautiful TUI**: Interactive terminal interface built with Bubble Tea
-- ⏺️ **Global Key Recording**: Capture key sequences with precise timing
+- ⏺️ **Global Key Recording**: Native macOS CGEventTap for accurate capture
 - 📝 **Macro Management**: Full CRUD operations with edit functionality
-- ⌨️ **Hotkey Support**: Assign custom hotkeys to trigger macros instantly
+- ⌨️ **Hotkey Triggers**: Press custom hotkeys to instantly execute macros
 - 🔄 **Daemon Architecture**: Background service for system-wide functionality
 - 💾 **Persistent Storage**: JSON-based storage for macro persistence
-- 🛡️ **Safety Features**: Confirmation dialogs for destructive actions
+- 🛡️ **Safety Features**: Confirmation dialogs and smart recording controls
 
 ## Architecture
 
@@ -72,10 +72,15 @@ make run-tui
 
 3. **Record your first macro**:
    - Press `r` to start recording
-   - Perform your key sequence
+   - Type your key sequence (e.g., "Hello World!")
    - Press `Esc` to stop recording
    - Fill in the macro details
    - Press `Enter` to save
+
+4. **Use your macro**:
+   - Enable it with `Space`
+   - Press the hotkey anywhere (e.g., Ctrl+Shift+1)
+   - Or press `p` in the TUI to play manually
 
 ## Usage
 
@@ -96,9 +101,13 @@ make run-tui
 ### Recording Mode
 
 When recording (`r` key):
-1. **Key Capture Phase**: Press your key sequence, `Esc` to finish
-2. **Details Phase**: Fill in name, description, and hotkey
-3. **Save**: Press `Enter` on the hotkey field to save
+1. **Global Capture**: All keystrokes are captured system-wide
+2. **Visual Feedback**: Recording status shown in real-time
+3. **Smart Stop**: Press `Esc` to stop recording (Esc not included in macro)
+4. **Form Entry**: Fill in name, description, and hotkey (not recorded)
+5. **Save**: Press `Enter` on the hotkey field to save
+
+**Note**: The TUI disables during recording to prevent interference. All keys are captured globally by the daemon.
 
 ### macOS Permissions
 
@@ -112,16 +121,18 @@ The daemon requires Accessibility permissions for global key capture:
 ## Features in Detail
 
 ### Macro Recording
-- Captures exact key sequences with timing
-- Records modifier keys (Cmd, Ctrl, Alt, Shift)
-- Preserves delays between keystrokes
-- Visual feedback during recording
+- Native CGEventTap for system-wide capture
+- Smart key detection (capitals → lowercase + shift)
+- Special character support (!, @, # → base key + shift)
+- Precise timing preservation between keystrokes
+- Automatic Esc key filtering (stop trigger not recorded)
 
 ### Macro Playback
-- Accurate timing reproduction
-- Modifier key support
-- Background execution via hotkeys
-- Manual trigger from TUI
+- Native CGEventPost for accurate reproduction
+- Configurable minimum delay (50ms default)
+- Full modifier key support (Cmd, Ctrl, Alt, Shift)
+- Background hotkey triggers
+- Manual playback from TUI
 
 ### Macro Management
 - **Create**: Record new macros with custom metadata
@@ -198,18 +209,67 @@ make dev-tui
 
 ## Roadmap
 
+### Completed ✅
 - [x] Basic macro recording and playback
 - [x] TUI with table view
 - [x] Daemon/client architecture
 - [x] Persistent storage
 - [x] Edit functionality
 - [x] Delete confirmation
-- [ ] CGEventTap implementation for native key capture
-- [ ] Hotkey triggers
+- [x] Native CGEventTap implementation for key capture
+- [x] Global hotkey triggers
+- [x] Smart key recording (capitals, special chars)
+- [x] Pause/resume recording controls
+
+### Future Enhancements 🚀
 - [ ] Macro groups/categories
 - [ ] Import/export functionality
 - [ ] Cross-platform support (Linux, Windows)
 - [ ] Macro scripting language
+- [ ] Performance optimizations (see below)
+- [ ] Mouse event recording
+- [ ] Conditional macros
+- [ ] Loop/repeat functionality
+
+## Performance Notes
+
+### Current Implementation
+The macro playback currently uses a minimum 50ms delay between keystrokes for reliability. This ensures compatibility across different applications but may feel slow for gaming combos.
+
+### Optimization Opportunities
+
+1. **Adjustable Playback Speed**
+   - Add per-macro speed multiplier (0.1x - 10x)
+   - Allow microsecond precision for gaming
+   - Profile-based timing for different applications
+
+2. **Batch Key Events**
+   - Send multiple simultaneous keys as single event
+   - Optimize modifier key handling
+   - Reduce CGEventPost overhead
+
+3. **Direct Input Injection**
+   - Bypass event queue for faster delivery
+   - Use IOKit for lower-level access
+   - Application-specific injection methods
+
+4. **Recording Optimization**
+   - Filter duplicate modifier events
+   - Compress timing data
+   - Smart event coalescing
+
+### Configuration Ideas
+```json
+{
+  "playback": {
+    "defaultDelay": 50,
+    "minDelay": 0,
+    "speedMultiplier": 1.0,
+    "gamingMode": false,
+    "batchEvents": true
+  }
+}
+```
 
 ## License
 
