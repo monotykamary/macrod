@@ -14,6 +14,7 @@ package keylogger
 #import <ApplicationServices/ApplicationServices.h>
 #import <Carbon/Carbon.h>
 #import <dispatch/dispatch.h>
+#include <string.h>
 
 // Define event types if not already defined
 #ifndef kCGEventKeyDown
@@ -131,6 +132,105 @@ static void stopKeyCapture() {
     
     // Stop the run loop
     CFRunLoopStop(CFRunLoopGetCurrent());
+}
+
+// Play a key event
+static void playKeyEvent(int keyCode, int flags, int isKeyDown) {
+    CGEventRef event;
+    
+    if (isKeyDown) {
+        event = CGEventCreateKeyboardEvent(NULL, (CGKeyCode)keyCode, true);
+    } else {
+        event = CGEventCreateKeyboardEvent(NULL, (CGKeyCode)keyCode, false);
+    }
+    
+    if (event) {
+        // Set modifier flags
+        CGEventSetFlags(event, (CGEventFlags)flags);
+        
+        // Post the event
+        CGEventPost(kCGHIDEventTap, event);
+        
+        // Release the event
+        CFRelease(event);
+    }
+}
+
+// Get keycode from string
+static int getKeycodeFromString(const char* key) {
+    // Single character keys
+    if (strlen(key) == 1) {
+        char c = key[0];
+        switch(c) {
+            case 'a': return 0;
+            case 'b': return 11;
+            case 'c': return 8;
+            case 'd': return 2;
+            case 'e': return 14;
+            case 'f': return 3;
+            case 'g': return 5;
+            case 'h': return 4;
+            case 'i': return 34;
+            case 'j': return 38;
+            case 'k': return 40;
+            case 'l': return 37;
+            case 'm': return 46;
+            case 'n': return 45;
+            case 'o': return 31;
+            case 'p': return 35;
+            case 'q': return 12;
+            case 'r': return 15;
+            case 's': return 1;
+            case 't': return 17;
+            case 'u': return 32;
+            case 'v': return 9;
+            case 'w': return 13;
+            case 'x': return 7;
+            case 'y': return 16;
+            case 'z': return 6;
+            
+            case '0': return 29;
+            case '1': return 18;
+            case '2': return 19;
+            case '3': return 20;
+            case '4': return 21;
+            case '5': return 23;
+            case '6': return 22;
+            case '7': return 26;
+            case '8': return 28;
+            case '9': return 25;
+        }
+    }
+    
+    // Special keys
+    if (strcmp(key, "space") == 0) return 49;
+    if (strcmp(key, "enter") == 0) return 36;
+    if (strcmp(key, "tab") == 0) return 48;
+    if (strcmp(key, "escape") == 0 || strcmp(key, "esc") == 0) return 53;
+    if (strcmp(key, "backspace") == 0) return 51;
+    if (strcmp(key, "delete") == 0) return 117;
+    
+    // Arrow keys
+    if (strcmp(key, "up") == 0) return 126;
+    if (strcmp(key, "down") == 0) return 125;
+    if (strcmp(key, "left") == 0) return 123;
+    if (strcmp(key, "right") == 0) return 124;
+    
+    // Function keys
+    if (strcmp(key, "f1") == 0) return 122;
+    if (strcmp(key, "f2") == 0) return 120;
+    if (strcmp(key, "f3") == 0) return 99;
+    if (strcmp(key, "f4") == 0) return 118;
+    if (strcmp(key, "f5") == 0) return 96;
+    if (strcmp(key, "f6") == 0) return 97;
+    if (strcmp(key, "f7") == 0) return 98;
+    if (strcmp(key, "f8") == 0) return 100;
+    if (strcmp(key, "f9") == 0) return 101;
+    if (strcmp(key, "f10") == 0) return 109;
+    if (strcmp(key, "f11") == 0) return 103;
+    if (strcmp(key, "f12") == 0) return 111;
+    
+    return -1; // Unknown key
 }
 
 // Check if we have accessibility permissions
@@ -475,7 +575,7 @@ func (k *Keylogger) AddRecordedKey(key string, modifiers []string) {
 	log.Printf("Manually recorded: %s (delay: %v, modifiers: %v)", key, delay, modifiers)
 }
 
-// PlaybackMacro remains the same
+// PlaybackMacro using native CGEventPost
 func (k *Keylogger) PlaybackMacro(macro models.Macro) error {
 	if !macro.Enabled {
 		return fmt.Errorf("macro is disabled")
@@ -486,42 +586,46 @@ func (k *Keylogger) PlaybackMacro(macro models.Macro) error {
 	for i, action := range macro.Actions {
 		// Wait for the specified delay (except for the first action)
 		if i > 0 && action.Delay > 0 {
-			time.Sleep(action.Delay)
+			// Use a minimum delay of 50ms for better reliability
+			delay := action.Delay
+			if delay < 50*time.Millisecond {
+				delay = 50 * time.Millisecond
+			}
+			time.Sleep(delay)
 		}
 		
-		// Convert key string to keycode
-		keyCode := k.getKeyCode(action.Key)
+		// Get the keycode
+		keyCode := C.getKeycodeFromString(C.CString(action.Key))
 		if keyCode < 0 {
 			log.Printf("Unknown key: %s", action.Key)
 			continue
 		}
 		
-		k.kb.Clear()
-		
-		// Set modifiers
+		// Build modifier flags
+		flags := 0
 		for _, mod := range action.Modifiers {
 			switch mod {
 			case "ctrl", "control":
-				k.kb.HasCTRL(true)
+				flags |= int(C.kCGEventFlagMaskControl)
 			case "alt", "option":
-				k.kb.HasALT(true)
+				flags |= int(C.kCGEventFlagMaskAlternate)
 			case "shift":
-				k.kb.HasSHIFT(true)
+				flags |= int(C.kCGEventFlagMaskShift)
 			case "cmd", "command", "super":
-				k.kb.HasSuper(true)
+				flags |= int(C.kCGEventFlagMaskCommand)
 			}
 		}
 		
-		// Set the key
-		k.kb.SetKeys(keyCode)
-		
-		// Press and release
-		err := k.kb.Launching()
-		if err != nil {
-			log.Printf("Failed to send key %s: %v", action.Key, err)
-		}
+		// Send key down event
+		C.playKeyEvent(keyCode, C.int(flags), 1)
 		
 		// Small delay between press and release
+		time.Sleep(10 * time.Millisecond)
+		
+		// Send key up event
+		C.playKeyEvent(keyCode, C.int(flags), 0)
+		
+		// Small delay after key up
 		time.Sleep(10 * time.Millisecond)
 	}
 	
