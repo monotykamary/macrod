@@ -502,63 +502,13 @@ func (m model) updateRecording(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.isRecordingKeys = false
 			m.nameInput.Focus()
 			m.activeInput = 0
+			// Clear local keys - we'll get them from daemon when we save
+			m.recordedKeys = []string{}
 			return m, nil
 			
 		default:
-			// Record the key
-			keyStr := msg.String()
-			if len(keyStr) == 1 || isSpecialKey(keyStr) {
-				// Check if it's a capital letter
-				if len(keyStr) == 1 && keyStr >= "A" && keyStr <= "Z" {
-					// Convert to lowercase and add shift modifier
-					lowerKey := strings.ToLower(keyStr)
-					m.recordedKeys = append(m.recordedKeys, lowerKey + " (shift)")
-					
-					// Send to daemon with shift modifier
-					if m.ipcClient != nil {
-						m.ipcClient.AddRecordedKey(lowerKey, []string{"shift"})
-					}
-				} else if len(keyStr) == 1 {
-					// Check for special characters that need shift
-					shiftChars := map[string]string{
-						"!": "1", "@": "2", "#": "3", "$": "4", "%": "5",
-						"^": "6", "&": "7", "*": "8", "(": "9", ")": "0",
-						"_": "-", "+": "=", "{": "[", "}": "]", "|": "\\",
-						":": ";", "\"": "'", "<": ",", ">": ".", "?": "/", "~": "`",
-					}
-					if baseKey, needsShift := shiftChars[keyStr]; needsShift {
-						m.recordedKeys = append(m.recordedKeys, baseKey + " (shift)")
-						if m.ipcClient != nil {
-							m.ipcClient.AddRecordedKey(baseKey, []string{"shift"})
-						}
-					} else {
-						// Regular key
-						m.recordedKeys = append(m.recordedKeys, keyStr)
-						if m.ipcClient != nil {
-							m.ipcClient.AddRecordedKey(keyStr, []string{})
-						}
-					}
-				} else {
-					// Regular key
-					m.recordedKeys = append(m.recordedKeys, keyStr)
-					
-					// Send to daemon
-					if m.ipcClient != nil {
-						modifiers := []string{}
-						if strings.Contains(keyStr, "ctrl") {
-							modifiers = append(modifiers, "ctrl")
-						}
-						if strings.Contains(keyStr, "alt") {
-							modifiers = append(modifiers, "alt")
-						}
-						if strings.Contains(keyStr, "shift") {
-							modifiers = append(modifiers, "shift")
-						}
-						
-						m.ipcClient.AddRecordedKey(keyStr, modifiers)
-					}
-				}
-			}
+			// While in recording mode, we just wait for the user to press Esc
+			// The daemon is capturing all keys globally
 			return m, nil
 		}
 	}
@@ -829,21 +779,10 @@ func (m model) viewRecording() string {
 		s = titleStyle.Render("🔴 Recording Keys") + "\n\n"
 		s += "Press keys to record them. Press Esc or Ctrl+C when done.\n\n"
 		
-		// Show recorded keys
-		s += "Recorded keys: "
-		if len(m.recordedKeys) == 0 {
-			s += statusStyle.Render("(waiting for input...)")
-		} else {
-			keyStr := ""
-			for i, k := range m.recordedKeys {
-				if i > 0 {
-					keyStr += " → "
-				}
-				keyStr += formatKeyDisplay(k)
-			}
-			s += lipgloss.NewStyle().Foreground(lipgloss.Color("229")).Render(keyStr)
-		}
-		s += "\n\n"
+		// Show recording status
+		s += "Status: " + lipgloss.NewStyle().Foreground(lipgloss.Color("229")).Render("Recording globally...") + "\n\n"
+		s += "The daemon is capturing all your keystrokes.\n"
+		s += "Type your key sequence naturally.\n\n"
 		
 		s += statusStyle.Render("Press Esc or Ctrl+C to finish recording and fill in macro details")
 		return s
@@ -852,21 +791,8 @@ func (m model) viewRecording() string {
 	// Form mode
 	s = titleStyle.Render("✏️  Macro Details") + "\n\n"
 	
-	// Show recorded keys
-	s += "Recorded keys: "
-	if len(m.recordedKeys) == 0 {
-		s += statusStyle.Render("(none)")
-	} else {
-		keyStr := ""
-		for i, k := range m.recordedKeys {
-			if i > 0 {
-				keyStr += " → "
-			}
-			keyStr += formatKeyDisplay(k)
-		}
-		s += lipgloss.NewStyle().Foreground(lipgloss.Color("229")).Render(keyStr)
-	}
-	s += "\n\n"
+	// Show recorded keys info
+	s += "Recorded keys: " + statusStyle.Render("(captured by daemon - will be saved with macro)") + "\n\n"
 	
 	// Show inputs
 	s += "Macro Details:\n\n"

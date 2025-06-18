@@ -59,7 +59,7 @@ static CGEventRef keyEventCallback(CGEventTapProxy proxy, CGEventType type, CGEv
         return event;
     }
     
-    if (type != kCGEventKeyDown && type != kCGEventKeyUp && type != kCGEventFlagsChanged) {
+    if (type != kCGEventKeyDown) {
         return event;
     }
     
@@ -83,8 +83,8 @@ static int startKeyCapture() {
         return -1; // Not authorized
     }
     
-    // Create event tap
-    CGEventMask eventMask = (1 << kCGEventKeyDown) | (1 << kCGEventKeyUp) | (1 << kCGEventFlagsChanged);
+    // Create event tap - only capture key down events for recording
+    CGEventMask eventMask = (1 << kCGEventKeyDown);
     eventTap = CGEventTapCreate(kCGSessionEventTap,
                                 kCGHeadInsertEventTap,
                                 kCGEventTapOptionDefault,
@@ -485,7 +485,7 @@ func goKeyCallback(keyCode C.int, flags C.int, eventType C.int) {
 		return
 	}
 
-	// Only process key down events
+	// Only process key down events (ignore key up and modifier changes)
 	if eventType != C.kCGEventKeyDown {
 		return
 	}
