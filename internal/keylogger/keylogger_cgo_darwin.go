@@ -661,16 +661,28 @@ func (k *Keylogger) PlaybackMacro(macro models.Macro) error {
 		return fmt.Errorf("macro is disabled")
 	}
 	
-	log.Printf("Playing back macro: %s (%d actions)", macro.Name, len(macro.Actions))
+	// Default speed multiplier is 1.0
+	speedMultiplier := macro.SpeedMultiplier
+	if speedMultiplier == 0 {
+		speedMultiplier = 1.0
+	}
+	
+	log.Printf("Playing back macro: %s (%d actions, speed: %.1fx)", macro.Name, len(macro.Actions), speedMultiplier)
 	
 	for i, action := range macro.Actions {
 		// Wait for the specified delay (except for the first action)
 		if i > 0 && action.Delay > 0 {
-			// Use a minimum delay of 50ms for better reliability
-			delay := action.Delay
-			if delay < 50*time.Millisecond {
-				delay = 50 * time.Millisecond
+			// Apply speed multiplier to delay
+			delay := time.Duration(float32(action.Delay) / speedMultiplier)
+			
+			// For navigation keys, ensure minimum responsiveness
+			if isNavigationKey(action.Key) && delay > 20*time.Millisecond {
+				delay = 20 * time.Millisecond
+			} else if delay < 1*time.Millisecond {
+				// Ensure minimum 1ms delay to prevent issues
+				delay = 1 * time.Millisecond
 			}
+			
 			time.Sleep(delay)
 		}
 		
@@ -699,17 +711,31 @@ func (k *Keylogger) PlaybackMacro(macro models.Macro) error {
 		// Send key down event
 		C.playKeyEvent(keyCode, C.int(flags), 1)
 		
-		// Small delay between press and release
-		time.Sleep(10 * time.Millisecond)
+		// Minimal delay between press and release (1ms)
+		time.Sleep(1 * time.Millisecond)
 		
 		// Send key up event
 		C.playKeyEvent(keyCode, C.int(flags), 0)
 		
-		// Small delay after key up
-		time.Sleep(10 * time.Millisecond)
+		// Only add post-release delay for non-navigation keys
+		if !isNavigationKey(action.Key) {
+			time.Sleep(2 * time.Millisecond)
+		}
 	}
 	
 	return nil
+}
+
+// isNavigationKey checks if a key is a navigation key that should have reduced delays
+func isNavigationKey(key string) bool {
+	switch key {
+	case "up", "down", "left", "right", 
+	     "home", "end", "pageup", "pagedown",
+	     "tab", "escape", "esc":
+		return true
+	default:
+		return false
+	}
 }
 
 func (k *Keylogger) RegisterHotkey(hotkey string, callback func()) error {

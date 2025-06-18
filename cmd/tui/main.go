@@ -45,6 +45,8 @@ type keyMap struct {
 	Record   key.Binding
 	Play     key.Binding
 	Edit     key.Binding
+	SpeedUp   key.Binding
+	SpeedDown key.Binding
 }
 
 var keys = keyMap{
@@ -96,6 +98,14 @@ var keys = keyMap{
 		key.WithKeys("e"),
 		key.WithHelp("e", "edit macro"),
 	),
+	SpeedUp: key.NewBinding(
+		key.WithKeys("+", "="),
+		key.WithHelp("+/=", "increase speed"),
+	),
+	SpeedDown: key.NewBinding(
+		key.WithKeys("-", "_"),
+		key.WithHelp("-", "decrease speed"),
+	),
 }
 
 type state int
@@ -139,10 +149,11 @@ func newModel() model {
 	columns := []table.Column{
 		{Title: "Status", Width: 8},
 		{Title: "Name", Width: 20},
-		{Title: "Description", Width: 30},
+		{Title: "Description", Width: 25},
 		{Title: "Hotkey", Width: 15},
 		{Title: "Actions", Width: 10},
-		{Title: "Created", Width: 20},
+		{Title: "Speed", Width: 8},
+		{Title: "Created", Width: 17},
 	}
 
 	t := table.New(
@@ -217,12 +228,20 @@ func (m *model) updateTable() {
 		if macro.Enabled {
 			status = "✅"
 		}
+		
+		// Format speed multiplier
+		speed := "1.0x"
+		if macro.SpeedMultiplier > 0 {
+			speed = fmt.Sprintf("%.1fx", macro.SpeedMultiplier)
+		}
+		
 		rows = append(rows, table.Row{
 			status,
 			macro.Name,
 			macro.Description,
 			macro.Hotkey,
 			fmt.Sprintf("%d", len(macro.Actions)),
+			speed,
 			macro.CreatedAt.Format("2006-01-02 15:04"),
 		})
 	}
@@ -242,6 +261,7 @@ func getMockMacros() []models.Macro {
 				{Key: "c", Delay: 100 * time.Millisecond},
 			},
 			Enabled:   true,
+			SpeedMultiplier: 1.0,
 			CreatedAt: time.Now().Add(-24 * time.Hour),
 		},
 		{
@@ -255,6 +275,7 @@ func getMockMacros() []models.Macro {
 				{Key: "x", Delay: 50 * time.Millisecond},
 			},
 			Enabled:   false,
+			SpeedMultiplier: 2.0,
 			CreatedAt: time.Now().Add(-48 * time.Hour),
 		},
 	}
@@ -380,6 +401,58 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.recordedKeys = []string{}
 				for _, action := range macro.Actions {
 					m.recordedKeys = append(m.recordedKeys, action.Key)
+				}
+			}
+		case msg.String() == "+", msg.String() == "=":
+			// Increase speed multiplier
+			if len(m.macros) > 0 && m.table.Cursor() < len(m.macros) {
+				macro := &m.macros[m.table.Cursor()]
+				if macro.SpeedMultiplier < 5.0 {
+					macro.SpeedMultiplier += 0.5
+					if macro.SpeedMultiplier == 0.5 {
+						macro.SpeedMultiplier = 1.0
+					}
+					// Update in daemon
+					if m.ipcClient != nil {
+						if err := m.ipcClient.UpdateMacro(macro); err != nil {
+							m.err = err
+						} else {
+							// Reload to ensure sync
+							if macros, err := m.ipcClient.ListMacros(); err == nil {
+								m.macros = macros
+								m.updateTable()
+							}
+						}
+					} else {
+						m.updateTable()
+					}
+					return m, tea.Printf("Speed set to %.1fx", macro.SpeedMultiplier)
+				}
+			}
+		case msg.String() == "-", msg.String() == "_":
+			// Decrease speed multiplier
+			if len(m.macros) > 0 && m.table.Cursor() < len(m.macros) {
+				macro := &m.macros[m.table.Cursor()]
+				if macro.SpeedMultiplier > 0.5 {
+					macro.SpeedMultiplier -= 0.5
+					if macro.SpeedMultiplier <= 0 {
+						macro.SpeedMultiplier = 0.5
+					}
+					// Update in daemon
+					if m.ipcClient != nil {
+						if err := m.ipcClient.UpdateMacro(macro); err != nil {
+							m.err = err
+						} else {
+							// Reload to ensure sync
+							if macros, err := m.ipcClient.ListMacros(); err == nil {
+								m.macros = macros
+								m.updateTable()
+							}
+						}
+					} else {
+						m.updateTable()
+					}
+					return m, tea.Printf("Speed set to %.1fx", macro.SpeedMultiplier)
 				}
 			}
 		}
@@ -702,7 +775,7 @@ func (m model) View() string {
 	}
 	
 	// Help hint with key shortcuts
-	helpText := "space: toggle • e: edit • p: play • r: record • d: delete • ?: help • q: quit"
+	helpText := "space: toggle • e: edit • p: play • r: record • d: delete • +/-: speed • ?: help • q: quit"
 	s += statusStyle.Render(helpText) + "\n"
 	
 	return s
@@ -871,6 +944,7 @@ func (k keyMap) FullHelp() [][]key.Binding {
 		{k.Up, k.Down, k.Left, k.Right},
 		{k.Toggle, k.Edit, k.Delete},
 		{k.Play, k.Record, k.New},
+		{k.SpeedUp, k.SpeedDown},
 		{k.Help, k.Quit},
 	}
 }

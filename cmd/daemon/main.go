@@ -98,6 +98,7 @@ func (d *Daemon) loadMacros() error {
 					{Key: "1", Delay: 50 * time.Millisecond, Modifiers: []string{"shift"}},
 				},
 				Enabled:   true,
+				SpeedMultiplier: 1.0,
 				CreatedAt: time.Now(),
 				UpdatedAt: time.Now(),
 			},
@@ -110,6 +111,7 @@ func (d *Daemon) loadMacros() error {
 					{Key: "s", Modifiers: []string{"cmd"}},
 				},
 				Enabled:   false,
+				SpeedMultiplier: 1.0,
 				CreatedAt: time.Now(),
 				UpdatedAt: time.Now(),
 			},
@@ -124,6 +126,10 @@ func (d *Daemon) loadMacros() error {
 		log.Println("Created example macros")
 	} else {
 		for _, macro := range macros {
+			// Ensure speed multiplier has a default value
+			if macro.SpeedMultiplier == 0 {
+				macro.SpeedMultiplier = 1.0
+			}
 			d.macros[macro.ID] = macro
 		}
 	}
@@ -396,6 +402,7 @@ func (d *Daemon) handleStopRecording(request map[string]interface{}, encoder *js
 		Hotkey:      hotkey,
 		Actions:     keys,
 		Enabled:     true,
+		SpeedMultiplier: 1.0,
 	}
 
 	d.mu.Lock()
