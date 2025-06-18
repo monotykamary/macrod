@@ -506,23 +506,57 @@ func (m model) updateRecording(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			
 		default:
 			// Record the key
-			if len(msg.String()) == 1 || isSpecialKey(msg.String()) {
-				m.recordedKeys = append(m.recordedKeys, msg.String())
-				
-				// Send to daemon
-				if m.ipcClient != nil {
-					modifiers := []string{}
-					if strings.Contains(msg.String(), "ctrl") {
-						modifiers = append(modifiers, "ctrl")
-					}
-					if strings.Contains(msg.String(), "alt") {
-						modifiers = append(modifiers, "alt")
-					}
-					if strings.Contains(msg.String(), "shift") {
-						modifiers = append(modifiers, "shift")
-					}
+			keyStr := msg.String()
+			if len(keyStr) == 1 || isSpecialKey(keyStr) {
+				// Check if it's a capital letter
+				if len(keyStr) == 1 && keyStr >= "A" && keyStr <= "Z" {
+					// Convert to lowercase and add shift modifier
+					lowerKey := strings.ToLower(keyStr)
+					m.recordedKeys = append(m.recordedKeys, lowerKey + " (shift)")
 					
-					m.ipcClient.AddRecordedKey(msg.String(), modifiers)
+					// Send to daemon with shift modifier
+					if m.ipcClient != nil {
+						m.ipcClient.AddRecordedKey(lowerKey, []string{"shift"})
+					}
+				} else if len(keyStr) == 1 {
+					// Check for special characters that need shift
+					shiftChars := map[string]string{
+						"!": "1", "@": "2", "#": "3", "$": "4", "%": "5",
+						"^": "6", "&": "7", "*": "8", "(": "9", ")": "0",
+						"_": "-", "+": "=", "{": "[", "}": "]", "|": "\\",
+						":": ";", "\"": "'", "<": ",", ">": ".", "?": "/", "~": "`",
+					}
+					if baseKey, needsShift := shiftChars[keyStr]; needsShift {
+						m.recordedKeys = append(m.recordedKeys, baseKey + " (shift)")
+						if m.ipcClient != nil {
+							m.ipcClient.AddRecordedKey(baseKey, []string{"shift"})
+						}
+					} else {
+						// Regular key
+						m.recordedKeys = append(m.recordedKeys, keyStr)
+						if m.ipcClient != nil {
+							m.ipcClient.AddRecordedKey(keyStr, []string{})
+						}
+					}
+				} else {
+					// Regular key
+					m.recordedKeys = append(m.recordedKeys, keyStr)
+					
+					// Send to daemon
+					if m.ipcClient != nil {
+						modifiers := []string{}
+						if strings.Contains(keyStr, "ctrl") {
+							modifiers = append(modifiers, "ctrl")
+						}
+						if strings.Contains(keyStr, "alt") {
+							modifiers = append(modifiers, "alt")
+						}
+						if strings.Contains(keyStr, "shift") {
+							modifiers = append(modifiers, "shift")
+						}
+						
+						m.ipcClient.AddRecordedKey(keyStr, modifiers)
+					}
 				}
 			}
 			return m, nil
@@ -605,7 +639,7 @@ func (m model) updateRecording(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func isSpecialKey(key string) bool {
 	specialKeys := []string{
 		"up", "down", "left", "right",
-		"space", "backspace", "delete",
+		"space", "enter", "backspace", "delete", "tab", "escape", "esc",
 		"f1", "f2", "f3", "f4", "f5", "f6",
 		"f7", "f8", "f9", "f10", "f11", "f12",
 	}
@@ -616,6 +650,45 @@ func isSpecialKey(key string) bool {
 		}
 	}
 	return false
+}
+
+// formatKeyDisplay formats a key for display in the UI
+func formatKeyDisplay(key string) string {
+	// Handle shift indicator
+	if strings.HasSuffix(key, " (shift)") {
+		baseKey := strings.TrimSuffix(key, " (shift)")
+		// For single letters, show as uppercase
+		if len(baseKey) == 1 && baseKey >= "a" && baseKey <= "z" {
+			return strings.ToUpper(baseKey)
+		}
+		// For other keys, show with shift indicator
+		return formatKeyDisplay(baseKey) + "⇧"
+	}
+	
+	switch key {
+	case "space":
+		return "␣"
+	case "enter":
+		return "⏎"
+	case "tab":
+		return "⇥"
+	case "escape", "esc":
+		return "⎋"
+	case "backspace":
+		return "⌫"
+	case "delete":
+		return "⌦"
+	case "up":
+		return "↑"
+	case "down":
+		return "↓"
+	case "left":
+		return "←"
+	case "right":
+		return "→"
+	default:
+		return key
+	}
 }
 
 func (m model) View() string {
@@ -684,7 +757,7 @@ func (m model) viewEditMacro() string {
 			if i > 0 {
 				keyStr += " → "
 			}
-			keyStr += k
+			keyStr += formatKeyDisplay(k)
 		}
 		s += lipgloss.NewStyle().Foreground(lipgloss.Color("229")).Render(keyStr)
 	}
@@ -766,7 +839,7 @@ func (m model) viewRecording() string {
 				if i > 0 {
 					keyStr += " → "
 				}
-				keyStr += k
+				keyStr += formatKeyDisplay(k)
 			}
 			s += lipgloss.NewStyle().Foreground(lipgloss.Color("229")).Render(keyStr)
 		}
@@ -789,7 +862,7 @@ func (m model) viewRecording() string {
 			if i > 0 {
 				keyStr += " → "
 			}
-			keyStr += k
+			keyStr += formatKeyDisplay(k)
 		}
 		s += lipgloss.NewStyle().Foreground(lipgloss.Color("229")).Render(keyStr)
 	}

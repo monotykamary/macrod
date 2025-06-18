@@ -202,6 +202,19 @@ static int getKeycodeFromString(const char* key) {
         }
     }
     
+    // Punctuation and symbols
+    if (strcmp(key, "-") == 0) return 27;
+    if (strcmp(key, "=") == 0) return 24;
+    if (strcmp(key, "[") == 0) return 33;
+    if (strcmp(key, "]") == 0) return 30;
+    if (strcmp(key, "\\") == 0) return 42;
+    if (strcmp(key, ";") == 0) return 41;
+    if (strcmp(key, "'") == 0) return 39;
+    if (strcmp(key, ",") == 0) return 43;
+    if (strcmp(key, ".") == 0) return 47;
+    if (strcmp(key, "/") == 0) return 44;
+    if (strcmp(key, "`") == 0) return 50;
+    
     // Special keys
     if (strcmp(key, "space") == 0) return 49;
     if (strcmp(key, "enter") == 0) return 36;
@@ -242,7 +255,7 @@ static int hasAccessibilityPermissions() {
 // Using numeric values for macOS keycodes
 static const char* keycodeToString(int keyCode) {
     switch(keyCode) {
-        // Letters
+        // Letters (always return lowercase, shift is handled separately)
         case 0: return "a";
         case 11: return "b";
         case 8: return "c";
