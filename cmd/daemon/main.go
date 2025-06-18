@@ -220,6 +220,8 @@ func (d *Daemon) handleConnection(conn net.Conn) {
 		d.handlePlay(request, encoder)
 	case "update":
 		d.handleUpdate(request, encoder)
+	case "getRecordingStatus":
+		d.handleGetRecordingStatus(encoder)
 	default:
 		encoder.Encode(map[string]string{"error": "unknown command"})
 	}
@@ -426,6 +428,24 @@ func (d *Daemon) handlePlay(request map[string]interface{}, encoder *json.Encode
 	go d.playbackMacro(macroID)
 	
 	encoder.Encode(map[string]bool{"success": true})
+}
+
+func (d *Daemon) handleGetRecordingStatus(encoder *json.Encoder) {
+	if !d.recording {
+		encoder.Encode(map[string]interface{}{
+			"recording": false,
+			"keys":      []models.KeyAction{},
+		})
+		return
+	}
+	
+	// Get current recorded keys from keylogger (without stopping)
+	keys := d.keylogger.GetCurrentRecordedKeys()
+	
+	encoder.Encode(map[string]interface{}{
+		"recording": true,
+		"keys":      keys,
+	})
 }
 
 func (d *Daemon) handleUpdate(request map[string]interface{}, encoder *json.Encoder) {

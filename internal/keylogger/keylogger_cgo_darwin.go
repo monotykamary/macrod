@@ -438,10 +438,38 @@ func (k *Keylogger) StopRecording() []models.KeyAction {
 	default:
 	}
 	
-	keys := k.currentKeys
+	// Filter out the escape key if it's the last key
+	keys := make([]models.KeyAction, 0, len(k.currentKeys))
+	for i, key := range k.currentKeys {
+		// Skip the last key if it's escape (the stop trigger)
+		if i == len(k.currentKeys)-1 && key.Key == "escape" {
+			continue
+		}
+		keys = append(keys, key)
+	}
 	k.currentKeys = nil
 	
 	log.Printf("Stopped global key capture - captured %d keys", len(keys))
+	return keys
+}
+
+func (k *Keylogger) GetCurrentRecordedKeys() []models.KeyAction {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	
+	if !k.recording {
+		return []models.KeyAction{}
+	}
+	
+	// Return a copy of current keys (excluding the last one if it's escape)
+	keys := make([]models.KeyAction, 0, len(k.currentKeys))
+	for i, key := range k.currentKeys {
+		// Skip the last key if it's escape (the stop trigger)
+		if i == len(k.currentKeys)-1 && key.Key == "escape" {
+			continue
+		}
+		keys = append(keys, key)
+	}
 	return keys
 }
 

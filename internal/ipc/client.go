@@ -133,6 +133,34 @@ func (c *Client) StartRecording() error {
 	return err
 }
 
+func (c *Client) GetRecordingStatus() ([]models.KeyAction, error) {
+	resp, err := c.sendRequest(map[string]interface{}{
+		"command": "getRecordingStatus",
+	})
+	if err != nil {
+		return nil, err
+	}
+	
+	// Extract keys from response
+	keysData, ok := resp["keys"].([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("invalid response format")
+	}
+	
+	// Re-encode and decode to get proper type
+	data, err := json.Marshal(keysData)
+	if err != nil {
+		return nil, err
+	}
+	
+	var keys []models.KeyAction
+	if err := json.Unmarshal(data, &keys); err != nil {
+		return nil, err
+	}
+	
+	return keys, nil
+}
+
 func (c *Client) AddRecordedKey(key string, modifiers []string) error {
 	_, err := c.sendRequest(map[string]interface{}{
 		"command":   "addKey",

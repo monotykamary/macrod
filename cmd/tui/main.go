@@ -502,8 +502,27 @@ func (m model) updateRecording(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.isRecordingKeys = false
 			m.nameInput.Focus()
 			m.activeInput = 0
-			// Clear local keys - we'll get them from daemon when we save
-			m.recordedKeys = []string{}
+			
+			// Get the recorded keys from daemon
+			if m.ipcClient != nil {
+				if keys, err := m.ipcClient.GetRecordingStatus(); err == nil {
+					// Convert KeyActions to display strings
+					m.recordedKeys = []string{}
+					for _, action := range keys {
+						keyStr := action.Key
+						if len(action.Modifiers) > 0 {
+							for _, mod := range action.Modifiers {
+								if mod == "shift" && len(keyStr) == 1 {
+									// Don't add (shift) suffix for single letters
+									keyStr = keyStr + " (shift)"
+									break
+								}
+							}
+						}
+						m.recordedKeys = append(m.recordedKeys, keyStr)
+					}
+				}
+			}
 			return m, nil
 			
 		default:
@@ -791,8 +810,21 @@ func (m model) viewRecording() string {
 	// Form mode
 	s = titleStyle.Render("✏️  Macro Details") + "\n\n"
 	
-	// Show recorded keys info
-	s += "Recorded keys: " + statusStyle.Render("(captured by daemon - will be saved with macro)") + "\n\n"
+	// Show recorded keys
+	s += "Recorded keys: "
+	if len(m.recordedKeys) == 0 {
+		s += statusStyle.Render("(none)")
+	} else {
+		keyStr := ""
+		for i, k := range m.recordedKeys {
+			if i > 0 {
+				keyStr += " → "
+			}
+			keyStr += formatKeyDisplay(k)
+		}
+		s += lipgloss.NewStyle().Foreground(lipgloss.Color("229")).Render(keyStr)
+	}
+	s += "\n\n"
 	
 	// Show inputs
 	s += "Macro Details:\n\n"
