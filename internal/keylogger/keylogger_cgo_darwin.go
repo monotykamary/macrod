@@ -1,3 +1,4 @@
+//go:build darwin && cgo
 // +build darwin,cgo
 
 package keylogger
@@ -5,6 +6,9 @@ package keylogger
 /*
 #cgo CFLAGS: -x objective-c
 #cgo LDFLAGS: -framework Cocoa -framework Carbon -framework ApplicationServices -framework CoreFoundation
+
+#ifndef MACROD_KEYLOGGER_H
+#define MACROD_KEYLOGGER_H
 
 #import <CoreFoundation/CoreFoundation.h>
 #import <ApplicationServices/ApplicationServices.h>
@@ -45,7 +49,7 @@ static CFRunLoopSourceRef runLoopSource = NULL;
 static dispatch_queue_t eventQueue = NULL;
 
 // Key event callback
-CGEventRef keyEventCallback(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *refcon) {
+static CGEventRef keyEventCallback(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *refcon) {
     if (type == kCGEventTapDisabledByTimeout || type == kCGEventTapDisabledByUserInput) {
         // Re-enable the event tap
         if (eventTap) {
@@ -69,7 +73,7 @@ CGEventRef keyEventCallback(CGEventTapProxy proxy, CGEventType type, CGEventRef 
 }
 
 // Start capturing keys
-int startKeyCapture() {
+static int startKeyCapture() {
     // Check for accessibility permissions
     if (!AXIsProcessTrustedWithOptions(NULL)) {
         // Request permissions
@@ -107,7 +111,7 @@ int startKeyCapture() {
 }
 
 // Stop capturing keys
-void stopKeyCapture() {
+static void stopKeyCapture() {
     if (eventTap) {
         CGEventTapEnable(eventTap, false);
         CFRelease(eventTap);
@@ -130,13 +134,13 @@ void stopKeyCapture() {
 }
 
 // Check if we have accessibility permissions
-int hasAccessibilityPermissions() {
+static int hasAccessibilityPermissions() {
     return AXIsProcessTrustedWithOptions(NULL) ? 1 : 0;
 }
 
 // Convert keycode to string (basic mapping)
 // Using numeric values for macOS keycodes
-const char* keycodeToString(int keyCode) {
+static const char* keycodeToString(int keyCode) {
     switch(keyCode) {
         // Letters
         case 0: return "a";
@@ -208,6 +212,8 @@ const char* keycodeToString(int keyCode) {
         default: return "unknown";
     }
 }
+
+#endif // MACROD_KEYLOGGER_H
 */
 import "C"
 import (
