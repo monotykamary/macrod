@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"sort"
 	"sync"
 	"syscall"
 	"time"
@@ -257,6 +258,11 @@ func (d *Daemon) handleList(encoder *json.Encoder) {
 	for _, macro := range d.macros {
 		macroList = append(macroList, macro)
 	}
+	
+	// Sort by creation time to maintain consistent order
+	sort.Slice(macroList, func(i, j int) bool {
+		return macroList[i].CreatedAt.Before(macroList[j].CreatedAt)
+	})
 
 	encoder.Encode(map[string]interface{}{
 		"macros": macroList,
@@ -403,6 +409,8 @@ func (d *Daemon) handleStopRecording(request map[string]interface{}, encoder *js
 		Actions:     keys,
 		Enabled:     true,
 		SpeedMultiplier: 1.0,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
 	}
 
 	d.mu.Lock()
@@ -533,6 +541,11 @@ func (d *Daemon) saveMacros() {
 	for _, macro := range d.macros {
 		macroList = append(macroList, macro)
 	}
+	
+	// Sort by creation time to maintain consistent order
+	sort.Slice(macroList, func(i, j int) bool {
+		return macroList[i].CreatedAt.Before(macroList[j].CreatedAt)
+	})
 
 	if err := d.storage.SaveMacros(macroList); err != nil {
 		log.Printf("Failed to save macros: %v", err)

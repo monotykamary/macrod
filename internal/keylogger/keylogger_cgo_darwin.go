@@ -47,7 +47,8 @@ package keylogger
 #endif
 
 // Callback function declaration
-extern void goKeyCallback(int keyCode, int flags, int eventType, int isRepeat);
+// Returns 1 if the event should be consumed (hotkey matched), 0 otherwise
+extern int goKeyCallback(int keyCode, int flags, int eventType, int isRepeat);
 
 // Global variables for the event tap
 static CFMachPortRef eventTap = NULL;
@@ -75,9 +76,14 @@ static CGEventRef keyEventCallback(CGEventTapProxy proxy, CGEventType type, CGEv
     int64_t keyRepeat = CGEventGetIntegerValueField(event, kCGKeyboardEventAutorepeat);
     
     // Call Go callback with repeat flag
-    goKeyCallback((int)keyCode, (int)flags, (int)type, (int)keyRepeat);
+    int consumed = goKeyCallback((int)keyCode, (int)flags, (int)type, (int)keyRepeat);
     
-    // Pass through the event
+    // If the event was consumed (hotkey matched), return NULL to prevent it from being passed through
+    if (consumed) {
+        return NULL;
+    }
+    
+    // Otherwise, pass through the event
     return event;
 }
 
@@ -365,6 +371,7 @@ type Keylogger struct {
 	stopChan      chan bool
 	runLoop       bool
 	monitoring    bool  // True when monitoring for hotkeys
+	isPlayingBack bool  // True when playing back a macro
 	mu            sync.Mutex
 }
 
@@ -537,30 +544,30 @@ func (k *Keylogger) processRecordedKeys() {
 
 // Export for C callback
 //export goKeyCallback
-func goKeyCallback(keyCode C.int, flags C.int, eventType C.int, isRepeat C.int) {
+func goKeyCallback(keyCode C.int, flags C.int, eventType C.int, isRepeat C.int) C.int {
 	globalMutex.Lock()
 	kl := globalKeylogger
 	globalMutex.Unlock()
 
 	if kl == nil {
-		return
+		return 0
 	}
 
 	// Only process key down events (ignore key up and modifier changes)
 	if eventType != C.kCGEventKeyDown {
-		return
+		return 0
 	}
 	
 	// Skip key repeats when recording
 	if kl.recording && isRepeat != 0 {
 		log.Printf("Skipping key repeat: keyCode=%d", keyCode)
-		return
+		return 0
 	}
 
 	// Convert keycode to string
 	keyStr := C.GoString(C.keycodeToString(keyCode))
 	if keyStr == "unknown" {
-		return
+		return 0
 	}
 
 	// Extract modifiers from flags
@@ -579,14 +586,14 @@ func goKeyCallback(keyCode C.int, flags C.int, eventType C.int, isRepeat C.int) 
 	}
 
 	// Check for hotkey matches when monitoring
-	if kl.monitoring && !kl.recording {
+	if kl.monitoring && !kl.recording && !kl.isPlayingBack {
 		hotkeyStr := buildHotkeyString(keyStr, modifiers)
 		kl.mu.Lock()
 		if callback, exists := kl.hotkeys[hotkeyStr]; exists {
 			kl.mu.Unlock()
 			// Execute callback in a goroutine to avoid blocking
 			go callback()
-			return
+			return 1 // Consume the event
 		}
 		kl.mu.Unlock()
 	}
@@ -610,6 +617,9 @@ func goKeyCallback(keyCode C.int, flags C.int, eventType C.int, isRepeat C.int) 
 			// Channel full, skip
 		}
 	}
+	
+	// Event not consumed
+	return 0
 }
 
 // buildHotkeyString creates a normalized hotkey string from key and modifiers
@@ -660,6 +670,22 @@ func (k *Keylogger) PlaybackMacro(macro models.Macro) error {
 	if !macro.Enabled {
 		return fmt.Errorf("macro is disabled")
 	}
+	
+	// Prevent recursive playback
+	k.mu.Lock()
+	if k.isPlayingBack {
+		k.mu.Unlock()
+		return fmt.Errorf("already playing back a macro")
+	}
+	k.isPlayingBack = true
+	k.mu.Unlock()
+	
+	// Ensure we reset the flag when done
+	defer func() {
+		k.mu.Lock()
+		k.isPlayingBack = false
+		k.mu.Unlock()
+	}()
 	
 	// Default speed multiplier is 1.0
 	speedMultiplier := macro.SpeedMultiplier
