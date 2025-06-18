@@ -407,23 +407,27 @@ func (k *Keylogger) StartRecording(onKeyPress func(key models.KeyAction)) error 
 	k.onKeyPress = onKeyPress
 	k.lastKeyTime = time.Now()
 	
-	// Start the event tap
-	result := C.startKeyCapture()
-	if result != 0 {
-		k.recording = false
-		if result == -1 {
-			return fmt.Errorf("accessibility permissions required")
+	// Only start event tap if not already monitoring
+	if !k.monitoring && !k.runLoop {
+		// Start the event tap
+		result := C.startKeyCapture()
+		if result != 0 {
+			k.recording = false
+			if result == -1 {
+				return fmt.Errorf("accessibility permissions required")
+			}
+			return fmt.Errorf("failed to start key capture")
 		}
-		return fmt.Errorf("failed to start key capture")
+		
+		// Start the run loop in a separate goroutine
+		k.runLoop = true
+		go k.runEventLoop()
 	}
 	
 	// Start processing recorded keys
 	go k.processRecordedKeys()
 	
-	// Start the run loop in a separate goroutine
-	go k.runEventLoop()
-	
-	log.Println("Started global key capture")
+	log.Printf("Started recording (event tap already running: %v)", k.monitoring || k.runLoop)
 	return nil
 }
 
@@ -435,9 +439,12 @@ func (k *Keylogger) PauseRecording() {
 		return
 	}
 	
-	// Just stop capturing but keep the recording state and keys
-	k.runLoop = false
-	C.stopKeyCapture()
+	// Don't stop the event tap if we're monitoring for hotkeys
+	// Just mark recording as paused
+	if !k.monitoring {
+		k.runLoop = false
+		C.stopKeyCapture()
+	}
 	
 	log.Println("Paused key recording")
 }
@@ -451,10 +458,12 @@ func (k *Keylogger) StopRecording() []models.KeyAction {
 	}
 	
 	k.recording = false
-	k.runLoop = false
 	
-	// Stop the event tap if it's still running
-	C.stopKeyCapture()
+	// Only stop the event tap if we're not monitoring for hotkeys
+	if !k.monitoring {
+		k.runLoop = false
+		C.stopKeyCapture()
+	}
 	
 	// Signal stop
 	select {
