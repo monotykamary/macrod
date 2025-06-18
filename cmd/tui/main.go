@@ -532,7 +532,7 @@ func (m model) updateRecording(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+c", "esc":
 		// Cancel everything
 		if m.ipcClient != nil {
-			m.ipcClient.StopRecording("", "", "")
+			m.ipcClient.CancelRecording()
 		}
 		m.recording = false
 		m.state = stateTable
