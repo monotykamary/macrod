@@ -41,8 +41,13 @@ package keylogger
 #define kCGEventFlagMaskCommand 0x00100000
 #endif
 
+// Define keyboard event field
+#ifndef kCGKeyboardEventAutorepeat
+#define kCGKeyboardEventAutorepeat 3
+#endif
+
 // Callback function declaration
-extern void goKeyCallback(int keyCode, int flags, int eventType);
+extern void goKeyCallback(int keyCode, int flags, int eventType, int isRepeat);
 
 // Global variables for the event tap
 static CFMachPortRef eventTap = NULL;
@@ -66,8 +71,11 @@ static CGEventRef keyEventCallback(CGEventTapProxy proxy, CGEventType type, CGEv
     CGKeyCode keyCode = (CGKeyCode)CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode);
     CGEventFlags flags = CGEventGetFlags(event);
     
-    // Call Go callback
-    goKeyCallback((int)keyCode, (int)flags, (int)type);
+    // Check if this is a key repeat
+    int64_t keyRepeat = CGEventGetIntegerValueField(event, kCGKeyboardEventAutorepeat);
+    
+    // Call Go callback with repeat flag
+    goKeyCallback((int)keyCode, (int)flags, (int)type, (int)keyRepeat);
     
     // Pass through the event
     return event;
@@ -352,6 +360,7 @@ type Keylogger struct {
 	hotkeys       map[string]func()
 	kb            keybd_event.KeyBonding
 	lastKeyTime   time.Time
+	lastKeyCode   int     // Track last key to detect repeats
 	recordingChan chan models.KeyAction
 	stopChan      chan bool
 	runLoop       bool
@@ -519,7 +528,7 @@ func (k *Keylogger) processRecordedKeys() {
 
 // Export for C callback
 //export goKeyCallback
-func goKeyCallback(keyCode C.int, flags C.int, eventType C.int) {
+func goKeyCallback(keyCode C.int, flags C.int, eventType C.int, isRepeat C.int) {
 	globalMutex.Lock()
 	kl := globalKeylogger
 	globalMutex.Unlock()
@@ -530,6 +539,12 @@ func goKeyCallback(keyCode C.int, flags C.int, eventType C.int) {
 
 	// Only process key down events (ignore key up and modifier changes)
 	if eventType != C.kCGEventKeyDown {
+		return
+	}
+	
+	// Skip key repeats when recording
+	if kl.recording && isRepeat != 0 {
+		log.Printf("Skipping key repeat: keyCode=%d", keyCode)
 		return
 	}
 
