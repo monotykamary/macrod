@@ -222,6 +222,13 @@ func newModel() model {
 }
 
 func (m *model) updateTable() {
+	// Save current selected macro ID
+	var selectedMacroID string
+	currentCursor := m.table.Cursor()
+	if currentCursor >= 0 && currentCursor < len(m.macros) {
+		selectedMacroID = m.macros[currentCursor].ID
+	}
+	
 	rows := []table.Row{}
 	for _, macro := range m.macros {
 		status := "❌"
@@ -246,6 +253,21 @@ func (m *model) updateTable() {
 		})
 	}
 	m.table.SetRows(rows)
+	
+	// Restore cursor position based on macro ID
+	if selectedMacroID != "" {
+		for i, macro := range m.macros {
+			if macro.ID == selectedMacroID {
+				m.table.SetCursor(i)
+				return
+			}
+		}
+	}
+	
+	// Fallback: restore by position if ID not found
+	if currentCursor < len(rows) {
+		m.table.SetCursor(currentCursor)
+	}
 }
 
 func getMockMacros() []models.Macro {
@@ -339,6 +361,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.updateTable()
 				}
 			}
+			return m, nil  // Return early to prevent table from processing the space key
 		case key.Matches(msg, keys.Delete):
 			if len(m.macros) > 0 && m.table.Cursor() < len(m.macros) {
 				// Show confirmation dialog
