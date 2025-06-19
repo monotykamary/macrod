@@ -6,6 +6,41 @@ A powerful TUI-based macro recording and playback daemon for macOS, designed for
 ![Platform](https://img.shields.io/badge/Platform-macOS-000000?style=flat&logo=apple)
 ![License](https://img.shields.io/badge/License-MIT-blue?style=flat)
 
+## Installation
+
+### Quick Install (Recommended)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/monotykamary/macrod/main/install.sh | bash
+```
+
+Or if you prefer to review the script first:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/monotykamary/macrod/main/install.sh -o install.sh
+cat install.sh  # Review the script
+bash install.sh
+```
+
+### Manual Installation
+
+1. Download the latest release for your architecture from the [releases page](https://github.com/monotykamary/macrod/releases)
+2. Extract the archive: `tar -xzf macrod-darwin-*.tar.gz`
+3. Move the binaries to `/usr/local/bin/`:
+   ```bash
+   sudo mv macrod-daemon macrod-tui /usr/local/bin/
+   ```
+4. Make them executable: `chmod +x /usr/local/bin/macrod-*`
+
+### Building from Source
+
+```bash
+git clone https://github.com/monotykamary/macrod.git
+cd macrod
+make build
+# Binaries will be in ./bin/
+```
+
 ## Features
 
 - 🎮 **Game-Ready**: Designed specifically for gameplay automation and combo execution
@@ -16,6 +51,34 @@ A powerful TUI-based macro recording and playback daemon for macOS, designed for
 - 🔄 **Daemon Architecture**: Background service for system-wide functionality
 - 💾 **Persistent Storage**: JSON-based storage for macro persistence
 - 🛡️ **Safety Features**: Confirmation dialogs and smart recording controls
+
+## Quick Start
+
+After installation, you'll have the `macrod` command available:
+
+```bash
+# Start the daemon in the background
+macrod start
+
+# Launch the TUI interface
+macrod
+
+# Check daemon status
+macrod status
+
+# Stop the daemon
+macrod stop
+```
+
+### First Time Setup
+
+1. **Grant Accessibility Permissions**: When you first run `macrod start`, macOS will prompt you to grant accessibility permissions. This is required for global key capture.
+
+2. **Start Recording**: In the TUI, press `r` to start recording a macro. Press keys for your combo, then press `Esc` to finish.
+
+3. **Set a Hotkey**: After recording, set a hotkey (like `ctrl+1`) to trigger your macro.
+
+4. **Play Your Macro**: Press `p` in the TUI or use your hotkey anywhere on your system!
 
 ## Architecture
 
@@ -34,34 +97,6 @@ The project uses a client-server architecture:
    - Interactive editing
 
 Communication happens via Unix sockets at `/tmp/macrod.sock`.
-
-## Installation
-
-### Prerequisites
-
-- macOS 10.15 or later
-- Go 1.21 or later
-- Accessibility permissions (for global key capture)
-
-### Building from Source
-
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/macrod.git
-cd macrod
-
-# Build both components
-make build
-
-# Or build individually
-make build-daemon
-make build-tui
-```
-
-## Quick Start
-
-1. **Start the daemon** (first time will request accessibility permissions):
-```bash
 make run-daemon
 ```
 
