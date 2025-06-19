@@ -42,7 +42,6 @@ jobs:
       run: |
         go mod download
         go mod verify
-        go mod tidy
     
     - name: Build release
       run: |
@@ -50,8 +49,10 @@ jobs:
         export CGO_ENABLED=1
         export GOOS=darwin
         export GOARCH=${{ matrix.goarch }}
-        go build -v -o dist/macrod-daemon ./cmd/daemon
-        go build -v -o dist/macrod-tui ./cmd/tui
+        # Build with explicit module mode
+        export GO111MODULE=on
+        go build -mod=readonly -v -o dist/macrod-daemon ./cmd/daemon
+        go build -mod=readonly -v -o dist/macrod-tui ./cmd/tui
         cd dist && tar -czf macrod-darwin-${{ matrix.arch }}.tar.gz macrod-daemon macrod-tui
     
     - name: Upload Release Asset
