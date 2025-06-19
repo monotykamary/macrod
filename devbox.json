@@ -1,0 +1,35 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.14.2/.schema/devbox.schema.json",
+  "packages": {
+    "go": "latest",
+    "gopls": "latest"
+  },
+  "shell": {
+    "init_hook": [
+      "echo 'Welcome to devbox!' > /dev/null"
+    ],
+    "scripts": {
+      "build": [
+        "make build"
+      ],
+      "build-daemon": [
+        "make build-daemon"
+      ],
+      "build-tui": [
+        "make build-tui"
+      ],
+      "run-daemon": [
+        "make run-daemon"
+      ],
+      "run-tui": [
+        "make run-tui"
+      ],
+      "test": [
+        "go test ./..."
+      ]
+    }
+  },
+  "env": {
+    "CC": "/usr/bin/clang"
+  }
+}
