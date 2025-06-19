@@ -1,6 +1,6 @@
 module github.com/monotykamary/macrod
 
-go 1.24.3
+go 1.21
 
 require (
 	github.com/charmbracelet/bubbles v0.21.0

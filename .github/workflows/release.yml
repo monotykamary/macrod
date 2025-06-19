@@ -52,9 +52,9 @@ jobs:
     - name: Build release
       run: |
         mkdir -p dist
-        # First, let's try building with simple go build
-        CGO_ENABLED=1 go build -o dist/macrod-daemon ./cmd/daemon/main.go
-        go build -o dist/macrod-tui ./cmd/tui/main.go
+        # Build packages, not individual files
+        CGO_ENABLED=1 go build -o dist/macrod-daemon ./cmd/daemon
+        go build -o dist/macrod-tui ./cmd/tui
         cd dist && tar -czf macrod-darwin-${{ matrix.arch }}.tar.gz macrod-daemon macrod-tui
     
     - name: Upload Release Asset
