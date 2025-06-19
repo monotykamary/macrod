@@ -49,10 +49,12 @@ jobs:
         export CGO_ENABLED=1
         export GOOS=darwin
         export GOARCH=${{ matrix.goarch }}
-        # Build with explicit module mode
+        # Ensure we're in the right directory and module is recognized
         export GO111MODULE=on
-        go build -mod=readonly -v -o dist/macrod-daemon ./cmd/daemon
-        go build -mod=readonly -v -o dist/macrod-tui ./cmd/tui
+        export GOWORK=off
+        # Build using the module
+        go build -v -o dist/macrod-daemon github.com/monotykamary/macrod/cmd/daemon
+        go build -v -o dist/macrod-tui github.com/monotykamary/macrod/cmd/tui
         cd dist && tar -czf macrod-darwin-${{ matrix.arch }}.tar.gz macrod-daemon macrod-tui
     
     - name: Upload Release Asset
