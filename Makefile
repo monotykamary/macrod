@@ -26,13 +26,13 @@ install-deps:
 # Release targets
 release-darwin-amd64:
 	mkdir -p dist
-	GOOS=darwin GOARCH=amd64 CGO_ENABLED=1 go build -o dist/macrod-daemon cmd/daemon/main.go
+	CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 go build -o dist/macrod-daemon cmd/daemon/main.go
 	GOOS=darwin GOARCH=amd64 go build -o dist/macrod-tui cmd/tui/main.go
 	cd dist && tar -czf macrod-darwin-amd64.tar.gz macrod-daemon macrod-tui
 
 release-darwin-arm64:
 	mkdir -p dist
-	GOOS=darwin GOARCH=arm64 CGO_ENABLED=1 go build -o dist/macrod-daemon cmd/daemon/main.go
+	CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 go build -o dist/macrod-daemon cmd/daemon/main.go
 	GOOS=darwin GOARCH=arm64 go build -o dist/macrod-tui cmd/tui/main.go
 	cd dist && tar -czf macrod-darwin-arm64.tar.gz macrod-daemon macrod-tui
 
