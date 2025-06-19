@@ -37,6 +37,12 @@ jobs:
         go env
         pwd
         ls -la
+        echo "--- Checking go.mod ---"
+        cat go.mod
+        echo "--- Checking pkg/models ---"
+        ls -la pkg/models/
+        echo "--- Module list ---"
+        go list -m all | head -20
     
     - name: Download dependencies
       run: |
@@ -46,15 +52,9 @@ jobs:
     - name: Build release
       run: |
         mkdir -p dist
-        export CGO_ENABLED=1
-        export GOOS=darwin
-        export GOARCH=${{ matrix.goarch }}
-        # Ensure we're in the right directory and module is recognized
-        export GO111MODULE=on
-        export GOWORK=off
-        # Build using the module
-        go build -v -o dist/macrod-daemon github.com/monotykamary/macrod/cmd/daemon
-        go build -v -o dist/macrod-tui github.com/monotykamary/macrod/cmd/tui
+        # First, let's try building with simple go build
+        CGO_ENABLED=1 go build -o dist/macrod-daemon ./cmd/daemon/main.go
+        go build -o dist/macrod-tui ./cmd/tui/main.go
         cd dist && tar -czf macrod-darwin-${{ matrix.arch }}.tar.gz macrod-daemon macrod-tui
     
     - name: Upload Release Asset
