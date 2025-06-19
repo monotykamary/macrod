@@ -78,6 +78,9 @@ func (d *Daemon) loadMacros() error {
 
 	// If no macros exist, create some examples
 	if len(macros) == 0 {
+		// Use fixed dates for consistent ordering
+		baseTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+		
 		exampleMacros := []models.Macro{
 			{
 				ID:          "example1",
@@ -100,8 +103,8 @@ func (d *Daemon) loadMacros() error {
 				},
 				Enabled:   true,
 				SpeedMultiplier: 1.0,
-				CreatedAt: time.Now(),
-				UpdatedAt: time.Now(),
+				CreatedAt: baseTime,
+				UpdatedAt: baseTime,
 			},
 			{
 				ID:          "example2",
@@ -113,8 +116,8 @@ func (d *Daemon) loadMacros() error {
 				},
 				Enabled:   false,
 				SpeedMultiplier: 1.0,
-				CreatedAt: time.Now(),
-				UpdatedAt: time.Now(),
+				CreatedAt: baseTime.Add(time.Hour),
+				UpdatedAt: baseTime.Add(time.Hour),
 			},
 		}
 		
