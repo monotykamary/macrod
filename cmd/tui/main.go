@@ -283,7 +283,7 @@ func getMockMacros() []models.Macro {
 				{Key: "c", Delay: 100 * time.Millisecond},
 			},
 			Enabled:   true,
-			SpeedMultiplier: 1.0,
+			SpeedMultiplier: 5.0,
 			CreatedAt: time.Now().Add(-24 * time.Hour),
 		},
 		{
