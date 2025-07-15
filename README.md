@@ -310,6 +310,12 @@ The macro playback currently uses a minimum 50ms delay between keystrokes for re
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
+## Support
+
+If you find this project helpful, consider buying me a coffee!
+
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/monotykamary)
+
 ## Acknowledgments
 
 - [Bubble Tea](https://github.com/charmbracelet/bubbletea) - The excellent TUI framework
